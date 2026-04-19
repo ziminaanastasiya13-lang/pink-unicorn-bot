@@ -1,2 +1,1 @@
-worker: python pink-unicorn-bot.py
-
+worker: python bot.py

@@ -1,7 +1,7 @@
 """
 🦄 Pink Unicorn Radio Bot для Telegram
 =====================================
-Аналог @radiohubbot, но для Pink Unicorn Records (Hardstyle / Hardcore / Gabber / Hard Dance)
+Аналог @radiohubbot, но для Pink Unicorn Records (Rock / Metal / Alternative)
 
 УСТАНОВКА:
     pip install python-telegram-bot==20.7 requests
@@ -51,7 +51,7 @@ WEBAPP_URL = "https://ziminaanastasiya13-lang.github.io/pink-unicorn-radio/"
 # Прямая ссылка на поток Pink Unicorn Radio
 STREAM_URL = "https://cast2.my-ais.net/8022/stream"   # fallback URL
 STATION_NAME = "Pink Unicorn Radio 🦄"
-STATION_GENRE = "Hardstyle · Hardcore · Gabber · Hard Dance"
+STATION_GENRE = "Rock · Metal · Alternative"
 STATION_COUNTRY = "Узбекистан 🇺🇿"
 STATION_SITE = "https://pinkunicornrec.wixsite.com/home"
 STATION_LOGO = "https://static.wixstatic.com/media/6062a7_fbcc0346d0fe43ac8a6e08d6c6b915aa~mv2_d_1750_1750_s_2.png"
@@ -120,8 +120,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
     text = (
         f"🦄 *Привет, {user.first_name}!*\n\n"
-        f"Добро пожаловать в *Pink Unicorn Radio Bot* — твой портал в мир Hardstyle, "
-        f"Hardcore, Gabber и Hard Dance!\n\n"
+        f"Добро пожаловать в *Pink Unicorn Radio Bot* — твой портал в мир Rock, "
+f"Metal и Alternative музыки!\n\n"
         f"Pink Unicorn Records основан в 2017 году. "
         f"Только качественная и оригинальная музыка 24/7.\n\n"
         f"Выбери действие 👇"

@@ -11,6 +11,23 @@ import os
 
 PORT = int(os.environ.get("PORT", 8080))
 
+def get_artwork(artist, track):
+    try:
+        q = requests.utils.quote(f"{artist} {track}")
+        r = requests.get(
+            f"https://itunes.apple.com/search?term={q}&media=music&limit=1",
+            timeout=4
+        )
+        if r.ok:
+            data = r.json()
+            if data.get('results'):
+                url = data['results'][0].get('artworkUrl100', '')
+                if url:
+                    # Заменяем на максимальное качество
+                    return url.replace('100x100bb.jpg', '600x600bb.jpg')
+    except Exception as e:
+        print(f"Artwork ошибка: {e}")
+    return 'https://static.wixstatic.com/media/6062a7_fbcc0346d0fe43ac8a6e08d6c6b915aa~mv2_d_1750_1750_s_2.png'
 def get_now_playing():
     # Метод 1: ICY метаданные прямо из потока
     try:
@@ -25,7 +42,6 @@ def get_now_playing():
         )
         icy_metaint = int(r.headers.get("icy-metaint", 0))
         if icy_metaint > 0:
-            # Читаем данные до метаданных
             r.raw.read(icy_metaint)
             meta_len = ord(r.raw.read(1)) * 16
             if meta_len > 0:
@@ -34,15 +50,15 @@ def get_now_playing():
                 if m:
                     full = m.group(1).strip()
                     d = full.find(" - ")
-                    if d != -1:
-                        return {"artist": full[:d].strip(), "track": full[d+3:].strip()}
-                    if full:
-                        return {"artist": full, "track": ""}
+                    artist = full[:d].strip() if d != -1 else full
+                    track = full[d+3:].strip() if d != -1 else ""
+                    artwork = get_artwork(artist, track)
+                    return {"artist": artist, "track": track, "artwork": artwork}
         r.close()
     except Exception as e:
         print(f"ICY ошибка: {e}")
 
-    # Метод 2: onlineradiobox с другим User-Agent
+    # Метод 2: onlineradiobox
     try:
         r = requests.get(
             "https://onlineradiobox.com/uz/pinkunicorn/playlist/",
@@ -58,13 +74,14 @@ def get_now_playing():
             if m:
                 full = m.group(1).strip()
                 d = full.find(" - ")
-                if d != -1:
-                    return {"artist": full[:d].strip(), "track": full[d+3:].strip()}
-                return {"artist": full, "track": ""}
+                artist = full[:d].strip() if d != -1 else full
+                track = full[d+3:].strip() if d != -1 else ""
+                artwork = get_artwork(artist, track)
+                return {"artist": artist, "track": track, "artwork": artwork}
     except Exception as e:
         print(f"ORB ошибка: {e}")
 
-    return {"artist": "Pink Unicorn Radio", "track": "🎵 Live"}
+    return {"artist": "Pink Unicorn Radio", "track": "🎵 Live", "artwork": "https://static.wixstatic.com/media/6062a7_fbcc0346d0fe43ac8a6e08d6c6b915aa~mv2_d_1750_1750_s_2.png"}
 
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):

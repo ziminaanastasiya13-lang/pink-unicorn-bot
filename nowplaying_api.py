@@ -15,19 +15,28 @@ def get_now_playing():
     try:
         r = requests.get(
             "https://onlineradiobox.com/uz/pinkunicorn/playlist/",
-            headers={"User-Agent": "Mozilla/5.0"},
+            headers={"User-Agent": "Mozilla/5.0", "Accept-Language": "ru"},
             timeout=5
         )
         if r.ok:
-            m = re.search(r'/track/\d+/">([^<]{5,})</a>', r.text)
+            # Ищем строку "сейчас | [ссылка]Исполнитель - Трек"
+            m = re.search(r'(?:сейчас|Live).*?/track/\d+/">\s*([^<]{5,})\s*</a>', r.text, re.DOTALL)
             if m:
                 full = m.group(1).strip()
                 d = full.find(" - ")
                 if d != -1:
                     return {"artist": full[:d].strip(), "track": full[d+3:].strip()}
                 return {"artist": full, "track": ""}
-    except:
-        pass
+            # Запасной вариант — просто первая ссылка на трек
+            m2 = re.search(r'/track/\d+/">\s*([^<]{5,})\s*</a>', r.text)
+            if m2:
+                full = m2.group(1).strip()
+                d = full.find(" - ")
+                if d != -1:
+                    return {"artist": full[:d].strip(), "track": full[d+3:].strip()}
+                return {"artist": full, "track": ""}
+    except Exception as e:
+        print(f"Ошибка парсинга: {e}")
     return {"artist": "Pink Unicorn Radio", "track": "🎵 Live"}
 
 class Handler(BaseHTTPRequestHandler):

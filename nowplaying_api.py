@@ -12,31 +12,58 @@ import os
 PORT = int(os.environ.get("PORT", 8080))
 
 def get_now_playing():
+    # Метод 1: ICY метаданные прямо из потока
+    try:
+        r = requests.get(
+            "https://listen2.myradio24.com/unicorn",
+            headers={
+                "User-Agent": "Mozilla/5.0",
+                "Icy-MetaData": "1"
+            },
+            stream=True,
+            timeout=5
+        )
+        icy_metaint = int(r.headers.get("icy-metaint", 0))
+        if icy_metaint > 0:
+            # Читаем данные до метаданных
+            r.raw.read(icy_metaint)
+            meta_len = ord(r.raw.read(1)) * 16
+            if meta_len > 0:
+                meta = r.raw.read(meta_len).decode("utf-8", errors="ignore")
+                m = re.search(r"StreamTitle='([^']+)'", meta)
+                if m:
+                    full = m.group(1).strip()
+                    d = full.find(" - ")
+                    if d != -1:
+                        return {"artist": full[:d].strip(), "track": full[d+3:].strip()}
+                    if full:
+                        return {"artist": full, "track": ""}
+        r.close()
+    except Exception as e:
+        print(f"ICY ошибка: {e}")
+
+    # Метод 2: onlineradiobox с другим User-Agent
     try:
         r = requests.get(
             "https://onlineradiobox.com/uz/pinkunicorn/playlist/",
-            headers={"User-Agent": "Mozilla/5.0", "Accept-Language": "ru"},
+            headers={
+                "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15",
+                "Accept": "text/html",
+                "Accept-Language": "ru-RU,ru;q=0.9",
+            },
             timeout=5
         )
         if r.ok:
-            # Ищем строку "сейчас | [ссылка]Исполнитель - Трек"
-            m = re.search(r'(?:сейчас|Live).*?/track/\d+/">\s*([^<]{5,})\s*</a>', r.text, re.DOTALL)
+            m = re.search(r'/track/\d+/">\s*([^<]{5,})\s*</a>', r.text)
             if m:
                 full = m.group(1).strip()
                 d = full.find(" - ")
                 if d != -1:
                     return {"artist": full[:d].strip(), "track": full[d+3:].strip()}
                 return {"artist": full, "track": ""}
-            # Запасной вариант — просто первая ссылка на трек
-            m2 = re.search(r'/track/\d+/">\s*([^<]{5,})\s*</a>', r.text)
-            if m2:
-                full = m2.group(1).strip()
-                d = full.find(" - ")
-                if d != -1:
-                    return {"artist": full[:d].strip(), "track": full[d+3:].strip()}
-                return {"artist": full, "track": ""}
     except Exception as e:
-        print(f"Ошибка парсинга: {e}")
+        print(f"ORB ошибка: {e}")
+
     return {"artist": "Pink Unicorn Radio", "track": "🎵 Live"}
 
 class Handler(BaseHTTPRequestHandler):

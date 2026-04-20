@@ -19,6 +19,13 @@
 
 import logging
 import requests
+import os
+
+# Запускаем API сервер для метаданных
+try:
+    import nowplaying_api
+except Exception as e:
+    print(f"API сервер не запустился: {e}")
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,

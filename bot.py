@@ -164,11 +164,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     elif query.data == "genres":
         text = (
             "🎶 *Жанры Pink Unicorn Radio:*\n\n"
-            "⚡ *Hardstyle* — энергичный бит, пронзительные синты, мощный бас\n"
-            "🔥 *Hardcore / Gabber* — экстремально быстро и брутально\n"
-            "💜 *Hard Dance* — танцевальная электронная музыка с напором\n\n"
-            "_Только оригинальная музыка — никакого мейнстрима!_"
-        )
+            "🎸 *Rock* — мощные гитары, энергичный ритм\n"
+            "🤘 *Metal* — тяжёлые риффы, брутальный звук\n"
+            "🎵 *Alternative* — нестандартный подход к музыке\n\n"
+                )
         await query.edit_message_caption(
             caption=text, parse_mode="Markdown", reply_markup=back_keyboard()
         )

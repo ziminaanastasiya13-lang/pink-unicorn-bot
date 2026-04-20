@@ -1,10 +1,5 @@
 """
-API сервер для Pink Unicorn Radio
-- /                  — текущий трек
-- /spotify/login     — авторизация Spotify
-- /spotify/callback  — сохраняет токен
-- /spotify/check     — проверяет подключение
-- /spotify/add       — добавляет трек в плейлист
+API сервер для Pink Unicorn Radio с постоянным хранением токенов
 """
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import requests
@@ -18,8 +13,26 @@ PORT = int(os.environ.get("PORT", 8080))
 SPOTIFY_CLIENT_ID = 'f146531bb7924a378c94c672ec31faa3'
 SPOTIFY_CLIENT_SECRET = '04d25dc90e9344edbb8f1a4593b3e9e1'
 SPOTIFY_REDIRECT = 'https://pink-unicorn-bot-production.up.railway.app/spotify/callback'
+TOKENS_FILE = '/tmp/spotify_tokens.json'
 
-tokens = {}
+# Загружаем токены из файла
+def load_tokens():
+    try:
+        if os.path.exists(TOKENS_FILE):
+            with open(TOKENS_FILE, 'r') as f:
+                return json.load(f)
+    except:
+        pass
+    return {}
+
+def save_tokens(tokens):
+    try:
+        with open(TOKENS_FILE, 'w') as f:
+            json.dump(tokens, f)
+    except Exception as e:
+        print(f"Ошибка сохранения токенов: {e}")
+
+tokens = load_tokens()
 
 def get_artwork(artist, track):
     try:
@@ -31,8 +44,8 @@ def get_artwork(artist, track):
                 url = data['results'][0].get('artworkUrl100', '')
                 if url:
                     return url.replace('100x100bb.jpg', '600x600bb.jpg')
-    except Exception as e:
-        print(f"Artwork ошибка: {e}")
+    except:
+        pass
     return 'https://static.wixstatic.com/media/6062a7_fbcc0346d0fe43ac8a6e08d6c6b915aa~mv2_d_1750_1750_s_2.png'
 
 def get_now_playing():
@@ -73,13 +86,46 @@ def get_now_playing():
     return {"artist": "Pink Unicorn Radio", "track": "Live",
             "artwork": "https://static.wixstatic.com/media/6062a7_fbcc0346d0fe43ac8a6e08d6c6b915aa~mv2_d_1750_1750_s_2.png"}
 
-def spotify_add(token, artist, track):
+def refresh_token(uid):
+    """Обновляем токен если истёк"""
+    if uid not in tokens:
+        return None
+    refresh = tokens[uid].get("refresh")
+    if not refresh:
+        return None
+    try:
+        r = requests.post("https://accounts.spotify.com/api/token",
+            data={"grant_type": "refresh_token", "refresh_token": refresh,
+                  "client_id": SPOTIFY_CLIENT_ID, "client_secret": SPOTIFY_CLIENT_SECRET},
+            timeout=5)
+        td = r.json()
+        if td.get("access_token"):
+            tokens[uid]["access"] = td["access_token"]
+            if td.get("refresh_token"):
+                tokens[uid]["refresh"] = td["refresh_token"]
+            save_tokens(tokens)
+            return td["access_token"]
+    except Exception as e:
+        print(f"Refresh ошибка: {e}")
+    return None
+
+def spotify_add(uid, artist, track):
+    if uid not in tokens:
+        return {"error": "not_connected"}
+    token = tokens[uid]["access"]
     try:
         q = requests.utils.quote(f"{artist} {track}")
         r = requests.get(f"https://api.spotify.com/v1/search?q={q}&type=track&limit=1",
             headers={"Authorization": f"Bearer {token}"}, timeout=5)
+        # Если токен истёк — обновляем
         if r.status_code == 401:
-            return {"error": "not_connected"}
+            token = refresh_token(uid)
+            if not token:
+                del tokens[uid]
+                save_tokens(tokens)
+                return {"error": "not_connected"}
+            r = requests.get(f"https://api.spotify.com/v1/search?q={q}&type=track&limit=1",
+                headers={"Authorization": f"Bearer {token}"}, timeout=5)
         items = r.json().get("tracks", {}).get("items", [])
         if not items:
             return {"error": "not_found"}
@@ -88,12 +134,12 @@ def spotify_add(token, artist, track):
         art = items[0]["artists"][0]["name"]
         me = requests.get("https://api.spotify.com/v1/me",
             headers={"Authorization": f"Bearer {token}"}, timeout=5).json()
-        uid = me["id"]
-        pls = requests.get(f"https://api.spotify.com/v1/users/{uid}/playlists?limit=50",
+        uid_sp = me["id"]
+        pls = requests.get(f"https://api.spotify.com/v1/users/{uid_sp}/playlists?limit=50",
             headers={"Authorization": f"Bearer {token}"}, timeout=5).json()
         pl = next((p for p in pls.get("items", []) if p["name"] == "Pink Unicorn Radio"), None)
         if not pl:
-            pl = requests.post(f"https://api.spotify.com/v1/users/{uid}/playlists",
+            pl = requests.post(f"https://api.spotify.com/v1/users/{uid_sp}/playlists",
                 headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
                 json={"name": "Pink Unicorn Radio", "description": "Треки с Pink Unicorn Radio", "public": False},
                 timeout=5).json()
@@ -162,36 +208,35 @@ class Handler(BaseHTTPRequestHandler):
                           "client_id": SPOTIFY_CLIENT_ID,
                           "client_secret": SPOTIFY_CLIENT_SECRET}, timeout=5)
                 td = r.json()
+                print(f"Token response: {td}")
                 if td.get("access_token"):
-                    tokens[state] = {"access": td["access_token"], "refresh": td.get("refresh_token")}
-                    print(f"Spotify токен сохранён: {state}")
+                    tokens[state] = {"access": td["access_token"], "refresh": td.get("refresh_token", "")}
+                    save_tokens(tokens)
+                    print(f"✅ Токен сохранён для {state}")
                     self.send_html("""<!DOCTYPE html><html><head><meta charset='utf-8'>
                     <style>body{background:#0a0010;color:#fff;font-family:sans-serif;
                     display:flex;align-items:center;justify-content:center;min-height:100vh;
-                    flex-direction:column;gap:16px;text-align:center;margin:0}</style></head><body>
+                    flex-direction:column;gap:16px;text-align:center;margin:0;padding:20px}</style></head><body>
                     <div style='font-size:60px'>✅</div>
                     <h2 style='color:#1DB954'>Spotify подключён!</h2>
                     <p style='opacity:0.7'>Вернись в Telegram и нажми ❤️ снова</p>
                     </body></html>""")
                 else:
-                    self.send_html("<h2>Ошибка получения токена</h2>")
+                    print(f"❌ Ошибка токена: {td}")
+                    self.send_html(f"<h2>Ошибка: {td.get('error_description', 'unknown')}</h2>")
             except Exception as e:
+                print(f"❌ Exception: {e}")
                 self.send_html(f"<h2>Ошибка: {e}</h2>")
 
         elif p == "/spotify/check":
             uid = params.get("user", ["anon"])[0]
-            self.send_json({"connected": uid in tokens})
+            self.send_json({"connected": uid in tokens, "uid": uid})
 
         elif p == "/spotify/add":
             uid = params.get("user", ["anon"])[0]
             artist = params.get("artist", [""])[0]
             track = params.get("track", [""])[0]
-            if uid not in tokens:
-                self.send_json({"error": "not_connected"})
-                return
-            result = spotify_add(tokens[uid]["access"], artist, track)
-            if result.get("error") == "not_connected":
-                del tokens[uid]
+            result = spotify_add(uid, artist, track)
             self.send_json(result)
         else:
             self.send_json({"error": "not found"}, 404)

@@ -49,7 +49,7 @@ BOT_TOKEN = os.environ.get("BOT_TOKEN", "ВСТАВЬ_ТОКЕН_СЮДА")
 WEBAPP_URL = "https://ziminaanastasiya13-lang.github.io/pink-unicorn-radio/"
 
 # Прямая ссылка на поток Pink Unicorn Radio
-STREAM_URL = "https://cast2.my-ais.net/8022/stream"   # fallback URL
+STREAM_URL = "https://myradio24.com/unicorn"   # fallback URL
 STATION_NAME = "Pink Unicorn Radio 🦄"
 STATION_GENRE = "Rock · Metal · Alternative"
 STATION_COUNTRY = "Узбекистан 🇺🇿"
